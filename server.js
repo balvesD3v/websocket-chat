@@ -20,26 +20,45 @@ app.use(cors({
     credentials: true,
 }));
 
+// Função para determinar o tipo de usuário (consultor ou cliente)
+function getUserType(userId) {
+    // Exemplo simples: IDs de consultores começam com 'consultant_'
+    if (userId.startsWith('consultant_')) {
+        return 'consultant';
+    } else {
+        return 'customer'; // Caso contrário, é um cliente
+    }
+}
+
 io.on('connection', (socket) => {
-    console.log('Um usuário se conectou: ', socket.id);
 
     socket.on('join room', (requestId) => {
+
         socket.join(requestId);
-        console.log(`Usuário ${socket.id} entrou na sala: ${requestId}`);
+
+        // Emitir para todos na sala o tipo de usuário que entrou
+        const userType = getUserType(socket.id);
+        io.to(requestId).emit('join room', userType);
+
+        // Verificar o número de usuários na sala
+        const room = io.sockets.adapter.rooms.get(requestId);
+        const numUsersInRoom = room ? room.size : 0;
+
+        // Iniciar o cronômetro quando ambos os usuários estiverem na sala
+        if (numUsersInRoom === 2) {
+            io.to(requestId).emit('start timer'); // Emite o evento para iniciar o cronômetro
+        }
     });
 
     socket.on('chat message', ({ requestId, message }) => {
-        console.log(`Mensagem recebida na sala ${requestId}:`, message);
-
-        // Emite a mensagem apenas para os usuários na sala específica
         io.to(requestId).emit('chat message', message);
-        console.log(`Mensagem enviada para a sala ${requestId}:`, message);
     });
 
     socket.on('disconnect', () => {
-        console.log('Um usuário se desconectou: ', socket.id);
     });
 });
+
+
 
 const PORT = 3000;
 server.listen(PORT, () => {

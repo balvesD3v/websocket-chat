@@ -22,7 +22,6 @@ app.use(cors({
 
 // Função para determinar o tipo de usuário (consultor ou cliente)
 function getUserType(userId) {
-    // Exemplo simples: IDs de consultores começam com 'consultant_'
     if (userId.startsWith('consultant_')) {
         return 'consultant';
     } else {
@@ -31,34 +30,43 @@ function getUserType(userId) {
 }
 
 io.on('connection', (socket) => {
+    let userType;
+    let requestId; // Variável para armazenar o requestId
 
-    socket.on('join room', (requestId) => {
-
+    socket.on('join room', (roomId) => {
+        requestId = roomId; // Armazenar o requestId
         socket.join(requestId);
-
-        // Emitir para todos na sala o tipo de usuário que entrou
-        const userType = getUserType(socket.id);
+        userType = getUserType(socket.id);
         io.to(requestId).emit('join room', userType);
 
-        // Verificar o número de usuários na sala
         const room = io.sockets.adapter.rooms.get(requestId);
         const numUsersInRoom = room ? room.size : 0;
 
-        // Iniciar o cronômetro quando ambos os usuários estiverem na sala
         if (numUsersInRoom === 2) {
-            io.to(requestId).emit('start timer'); // Emite o evento para iniciar o cronômetro
+            io.to(requestId).emit('start timer');
+            io.to(requestId).emit('chat enabled', true); // Permitir envio de mensagens
+        } else {
+            io.to(requestId).emit('chat enabled', false); // Não permitir envio de mensagens
         }
     });
 
-    socket.on('chat message', ({ requestId, message }) => {
-        io.to(requestId).emit('chat message', message);
+    socket.on('chat message', ({ message }) => {
+        // Verifique se o chat está habilitado
+        const room = io.sockets.adapter.rooms.get(requestId);
+        if (room && room.size === 2) {
+            io.to(requestId).emit('chat message', message);
+        }
     });
 
     socket.on('disconnect', () => {
+        const room = io.sockets.adapter.rooms.get(requestId);
+        const numUsersInRoom = room ? room.size : 0;
+
+        if (numUsersInRoom < 2) {
+            io.to(requestId).emit('chat enabled', false); // Desabilitar envio de mensagens
+        }
     });
 });
-
-
 
 const PORT = 3000;
 server.listen(PORT, () => {

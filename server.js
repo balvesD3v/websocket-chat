@@ -58,6 +58,23 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('end chat', () => {
+        // Envia uma mensagem personalizada para o usuário que encerrou o chat
+        io.to(socket.id).emit('chat message', {
+            message: 'Você encerrou o chat.',
+            sender: 'system' // Define o remetente como "system"
+        });
+
+        // Envia uma mensagem para o outro usuário informando que o chat foi encerrado
+        socket.to(requestId).emit('chat message', {
+            message: 'O outro participante encerrou o chat.',
+            sender: 'system' // Define o remetente como "system"
+        });
+
+        io.to(requestId).emit('chat ended'); // Emite o evento de encerramento para ambos
+    });
+
+
     socket.on('disconnect', () => {
         const room = io.sockets.adapter.rooms.get(requestId);
         const numUsersInRoom = room ? room.size : 0;
